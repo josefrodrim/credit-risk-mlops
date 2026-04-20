@@ -124,7 +124,7 @@ docker compose --profile demo up -d streamlit
 | API docs   | <http://localhost:8000/docs>    | —                            |
 | Nginx      | <http://localhost:80>           | —                            |
 | Prometheus | <http://localhost:9090>         | —                            |
-| Grafana    | <http://localhost:3000>         | admin/admin                  |
+| Grafana    | <http://localhost:3000>         | see LOCAL_SECRETS.md                                   |
 | Streamlit  | <http://localhost:8501>         | start with `--profile demo`  |
 
 ## Key results
@@ -182,6 +182,52 @@ docker compose build streamlit
 # then start:
 docker compose --profile demo up -d streamlit
 ```
+
+## Completed tasks (2026-04-20, session 2)
+
+### 4. Jenkinsfile critical fixes ✅
+
+- `MLFLOW_TRACKING_URI` corrected: `http://mlflow:5000` → `http://localhost:5001`
+  (internal Docker hostname is unreachable from host-based Jenkins; must use loopback + mapped port)
+- `mkdir -p ${REPORTS_DIR}` added to Setup stage — pytest was failing writing `junit.xml` to a
+  nonexistent `reports/` directory
+
+### 5. evidently added to requirements-dev.txt ✅
+
+- Added `evidently==0.7.21` — Jenkins Drift Detection stage calls `monitoring/drift_detector.py`
+  which imports evidently; was missing from dev deps causing CI stage failure.
+
+### 6. DevSecOps security patches to docker-compose.yml ✅
+
+- `GF_SECURITY_ADMIN_PASSWORD: admin` → `${GRAFANA_ADMIN_PASSWORD}` (externalized to `.env`)
+- `env_file: .env.example` → `env_file: .env` (API was reading placeholder values)
+- `"5001:5000"` → `"127.0.0.1:5001:5000"` (MLflow bound to loopback only — not exposed on LAN)
+- `ports: "9090:9090"` → `expose: "9090"` (Prometheus internal-only, not accessible from host)
+
+### 7. Secrets management ✅
+
+- `.env` created (gitignored): real runtime values for all services
+- `.env.example` updated: added `GRAFANA_ADMIN_PASSWORD=changeme` placeholder
+- `LOCAL_SECRETS.md` created (gitignored): full table of ports, credentials, env vars for local dev
+
+### 8. GitHub repository setup ✅
+
+- Remote: `https://github.com/josefrodrin/credit-risk-mlops.git`
+- Initial push required `git pull origin main --rebase` (GitHub had auto-created a LICENSE commit)
+- Commits pushed: `fea82fc` (initial), `7f2eac5` (security), `c2d4fed` (gitignore), `cc08d0a` (docs), `548b340` (docs fix)
+
+### 9. Git history rewrite — remove Co-Authored-By ✅
+
+- Claude appeared as a GitHub contributor due to `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>`
+- Removed with: `git filter-branch -f --msg-filter 'grep -v "Co-Authored-By: Claude"' -- --all`
+- Force-pushed to origin. GitHub contributor graph cache may take up to 24 h to expire.
+
+### 10. README.md fixes ✅
+
+- Python badge: `3.14` → `3.11` (Docker images use `python:3.11-slim`)
+- Clone URL: placeholder → `https://github.com/josefrodrin/credit-risk-mlops.git`
+- Services table: removed `admin/admin` from Grafana row
+- Monitoring section heading: removed `admin/admin` from `### Grafana (http://localhost:3000, admin/admin)`
 
 ## Reglas de git para este proyecto
 

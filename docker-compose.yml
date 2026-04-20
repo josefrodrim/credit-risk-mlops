@@ -6,6 +6,7 @@ volumes:
   mlflow-data:
   prometheus-data:
   grafana-data:
+  streamlit-data:
 
 services:
 
@@ -144,7 +145,7 @@ services:
     ports:
       - "8501:8501"
     volumes:
-      - ./data:/app/data
+      - streamlit-data:/app/data
     depends_on:
       api:
         condition: service_healthy
