@@ -1,0 +1,117 @@
+{
+  "expectation_suite_name": "credit_risk_suite",
+  "data_asset_type": null,
+  "expectations": [
+    {
+      "expectation_type": "expect_table_row_count_to_be_between",
+      "kwargs": { "min_value": 100000, "max_value": 2000000 }
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": { "column": "SeriousDlqin2yrs" }
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": { "column": "periodo" }
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": { "column": "RevolvingUtilizationOfUnsecuredLines" }
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": { "column": "age" }
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": { "column": "MonthlyIncome" }
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": { "column": "DebtRatio" }
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": { "column": "loan_amount" }
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": { "column": "credit_score_band" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "SeriousDlqin2yrs", "mostly": 1.0 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "periodo", "mostly": 1.0 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "RevolvingUtilizationOfUnsecuredLines", "mostly": 0.99 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "age", "mostly": 0.99 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "MonthlyIncome", "mostly": 0.95 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "loan_amount", "mostly": 0.99 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": {
+        "column": "SeriousDlqin2yrs",
+        "value_set": [0, 1]
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": {
+        "column": "credit_score_band",
+        "value_set": ["Poor", "Fair", "Good", "Very Good", "Exceptional"]
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "RevolvingUtilizationOfUnsecuredLines", "min_value": 0.0, "max_value": 1.0, "mostly": 0.99 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "age", "min_value": 18, "max_value": 110, "mostly": 0.99 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "DebtRatio", "min_value": 0.0, "mostly": 0.99 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "loan_amount", "min_value": 0.0, "mostly": 0.99 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "employment_years", "min_value": 0.0, "mostly": 0.99 }
+    },
+    {
+      "expectation_type": "expect_column_mean_to_be_between",
+      "kwargs": { "column": "SeriousDlqin2yrs", "min_value": 0.03, "max_value": 0.15 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "periodo",
+        "min_value": 202001,
+        "max_value": 202612,
+        "mostly": 1.0
+      }
+    }
+  ],
+  "meta": {
+    "great_expectations_version": "0.18.15",
+    "created_by": "credit-risk-mlops"
+  }
+}

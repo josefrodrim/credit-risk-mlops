@@ -1,0 +1,103 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+
+# ── Virtual environments ───────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+# project venv lives outside the repo at ~/.venvs/credit-risk-mlops
+# but guard against accidental creation here anyway
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ── Data ──────────────────────────────────────────────────────────────────────
+# Raw and processed data tracked by DVC, not git
+data/raw/
+data/processed/
+data/interim/
+data/external/
+# Keep DVC pointer files (.dvc) — those ARE committed
+!data/**/*.dvc
+
+# ── MLflow ────────────────────────────────────────────────────────────────────
+mlruns/
+mlartifacts/
+
+# ── Models ────────────────────────────────────────────────────────────────────
+models/
+*.pkl
+*.joblib
+*.cbm
+*.pt
+*.pth
+*.onnx
+
+# ── Reports / outputs ─────────────────────────────────────────────────────────
+reports/
+*.html
+# Exception: keep committed report templates if any
+!reports/.gitkeep
+
+# ── Metrics (DVC outputs) ─────────────────────────────────────────────────────
+metrics/
+
+# ── DVC cache ─────────────────────────────────────────────────────────────────
+.dvc/cache/
+.dvc/tmp/
+
+# ── Secrets / credentials ─────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Testing / coverage ────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.cover
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+# (compose files are committed; ignore only generated artifacts)
+docker/volumes/
+
+# ── Great Expectations ────────────────────────────────────────────────────────
+great_expectations/uncommitted/
+
+# ── Optuna ────────────────────────────────────────────────────────────────────
+optuna.db
+*.db
+
+# ── Local secrets (never commit) ──────────────────────────────────────────────
+LOCAL_SECRETS.md

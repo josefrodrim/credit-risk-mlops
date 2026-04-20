@@ -1,0 +1,80 @@
+stages:
+  generate:
+    cmd: python scripts/generate_dataset.py --params params.yaml
+    deps:
+      - scripts/generate_dataset.py
+      - params.yaml
+    params:
+      - data.n_samples
+      - data.default_rate
+      - data.random_seed
+    outs:
+      - data/raw/credit_risk.parquet
+
+  validate:
+    cmd: python scripts/validate_data.py --params params.yaml
+    deps:
+      - scripts/validate_data.py
+      - data/raw/credit_risk.parquet
+      - great_expectations/expectations/credit_risk_suite.json
+      - params.yaml
+    params:
+      - data.raw_path
+
+  featurize:
+    cmd: python scripts/featurize.py --params params.yaml
+    deps:
+      - scripts/featurize.py
+      - data/raw/credit_risk.parquet
+      - src/features.py
+      - params.yaml
+    params:
+      - data.train_end_periodo
+      - data.test_start_periodo
+      - data.test_end_periodo
+      - data.monitor_start_periodo
+      - features.period_col
+    outs:
+      - data/processed/train.parquet
+      - data/processed/test.parquet
+      - data/processed/monitor.parquet
+
+  train:
+    cmd: python src/train.py --params params.yaml
+    deps:
+      - src/train.py
+      - src/features.py
+      - data/processed/train.parquet
+      - data/processed/test.parquet
+      - params.yaml
+    params:
+      - model.n_trials
+      - model.cv_folds
+      - model.auc_threshold
+      - mlflow.experiment_name
+      - mlflow.model_name
+    outs:
+      - mlruns:
+          persist: true
+
+  evaluate:
+    cmd: python scripts/evaluate_model.py --params params.yaml
+    deps:
+      - scripts/evaluate_model.py
+      - src/evaluate.py
+      - src/features.py
+      - src/predict.py
+      - data/processed/test.parquet
+      - params.yaml
+    params:
+      - model.auc_threshold
+      - api.model_uri
+    outs:
+      - reports/metrics.json
+      - reports/model_card.json
+      - reports/shap_importance.csv:
+          cache: false
+
+metrics:
+  - reports/metrics.json:
+      cache: false

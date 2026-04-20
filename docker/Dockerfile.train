@@ -1,0 +1,25 @@
+# Training image — runs the full DVC pipeline inside Docker
+FROM python:3.11-slim AS base
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc git curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+COPY src/       ./src/
+COPY scripts/   ./scripts/
+COPY params.yaml .
+COPY dvc.yaml .
+
+RUN mkdir -p data/raw data/processed reports mlruns
+
+ENV PYTHONPATH="/app"
+ENV PYTHONUNBUFFERED="1"
+
+# Default: run the full DVC pipeline
+CMD ["python", "src/train.py", "--params", "params.yaml"]

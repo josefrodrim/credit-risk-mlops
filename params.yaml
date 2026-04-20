@@ -1,0 +1,56 @@
+data:
+  raw_path: data/raw/credit_risk.parquet
+  processed_path: data/processed/features.parquet
+  train_path: data/processed/train.parquet
+  test_path: data/processed/test.parquet
+  monitor_path: data/processed/monitor.parquet
+  train_end_periodo: 202312
+  test_start_periodo: 202401
+  test_end_periodo: 202512
+  monitor_start_periodo: 202601
+  n_samples: 1000000
+  default_rate: 0.07
+  random_seed: 42
+
+features:
+  numeric:
+    - RevolvingUtilizationOfUnsecuredLines
+    - age
+    - NumberOfTime30-59DaysPastDueNotWorse
+    - DebtRatio
+    - MonthlyIncome
+    - NumberOfOpenCreditLinesAndLoans
+    - NumberOfTimes90DaysLate
+    - NumberRealEstateLoansOrLines
+    - NumberOfTime60-89DaysPastDueNotWorse
+    - NumberOfDependents
+    - loan_amount
+    - employment_years
+  categorical:
+    - credit_score_band
+  target: SeriousDlqin2yrs
+  period_col: periodo
+
+model:
+  auc_threshold: 0.87
+  n_trials: 5
+  cv_folds: 3
+  xgb_model_name: xgboost-credit-risk
+  lgbm_model_name: lgbm-credit-risk
+
+mlflow:
+  experiment_name: credit-risk-mlops
+  tracking_uri: http://localhost:5001
+  model_name: credit-risk-model
+
+api:
+  batch_limit: 1000
+  host: 0.0.0.0
+  port: 8000
+  model_uri: models:/credit-risk-model/Production
+
+monitoring:
+  drift_threshold: 0.05
+  reference_data_path: data/processed/train.parquet
+  production_data_path: data/processed/monitor.parquet
+  report_path: reports/drift_report.html
