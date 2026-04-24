@@ -12,8 +12,9 @@ RUN pip install --upgrade pip && \
         streamlit==1.56.0 \
         plotly==5.24.1
 
-COPY app/      ./app/
-COPY src/      ./src/
+COPY app/       ./app/
+COPY src/       ./src/
+COPY .streamlit/ ./.streamlit/
 COPY params.yaml .
 
 ENV PYTHONPATH="/app"

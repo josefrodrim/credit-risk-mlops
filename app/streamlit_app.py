@@ -54,6 +54,155 @@ st.set_page_config(
     layout="wide",
 )
 
+st.markdown("""
+<style>
+/* ── Base & typography ── */
+* {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+                 "Helvetica Neue", Arial, sans-serif !important;
+}
+.stApp { background-color: #F5F5F7; }
+
+/* ── Headings ── */
+h1 {
+    font-size: 2.4rem !important; font-weight: 700 !important;
+    letter-spacing: -0.03em !important; color: #1D1D1F !important;
+    line-height: 1.1 !important;
+}
+h2, h3 {
+    font-weight: 600 !important; letter-spacing: -0.02em !important;
+    color: #1D1D1F !important;
+}
+
+/* ── Sidebar ── */
+[data-testid="stSidebar"] {
+    background-color: rgba(255,255,255,0.92) !important;
+    border-right: 1px solid rgba(0,0,0,0.07) !important;
+}
+
+/* ── Main block padding ── */
+.main .block-container { padding: 2rem 3rem; max-width: 1200px; }
+
+/* ── Primary button (Score / Submit) ── */
+.stButton > button {
+    background: #0071E3 !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 980px !important;
+    padding: 0.55rem 1.4rem !important;
+    font-size: 0.95rem !important;
+    font-weight: 500 !important;
+    letter-spacing: -0.01em !important;
+    transition: background 0.15s ease, transform 0.1s ease !important;
+}
+.stButton > button:hover { background: #0077ED !important; transform: scale(1.02) !important; }
+.stButton > button:active { transform: scale(0.98) !important; }
+
+/* ── Download button ── */
+[data-testid="stDownloadButton"] > button {
+    background: transparent !important;
+    color: #0071E3 !important;
+    border: 1.5px solid #0071E3 !important;
+    border-radius: 980px !important;
+    font-weight: 500 !important;
+}
+[data-testid="stDownloadButton"] > button:hover {
+    background: #0071E3 !important;
+    color: #FFFFFF !important;
+}
+
+/* ── Metric cards ── */
+[data-testid="stMetric"] {
+    background: #FFFFFF;
+    border-radius: 18px;
+    padding: 1.1rem 1.4rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    border: 1px solid rgba(0,0,0,0.04);
+}
+[data-testid="stMetricValue"] {
+    font-size: 1.75rem !important; font-weight: 700 !important;
+    color: #1D1D1F !important; letter-spacing: -0.03em !important;
+}
+[data-testid="stMetricLabel"] {
+    font-size: 0.82rem !important; font-weight: 500 !important;
+    color: #6E6E73 !important;
+}
+
+/* ── Form container ── */
+[data-testid="stForm"] {
+    background: #FFFFFF;
+    border-radius: 20px;
+    padding: 1.5rem 1.8rem;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+    border: 1px solid rgba(0,0,0,0.04);
+}
+
+/* ── File uploader ── */
+[data-testid="stFileUploader"] {
+    background: #FFFFFF;
+    border-radius: 16px;
+    border: 1.5px dashed #C7C7CC !important;
+    padding: 0.8rem;
+}
+
+/* ── Dataframe ── */
+[data-testid="stDataFrame"] {
+    border-radius: 14px !important;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+}
+
+/* ── Alerts ── */
+[data-testid="stAlert"] {
+    border-radius: 14px !important;
+    border: none !important;
+}
+.stSuccess { background: rgba(52,199,89,0.10) !important; }
+.stWarning { background: rgba(255,159,10,0.10) !important; }
+.stError   { background: rgba(255,59,48,0.10)  !important; }
+.stInfo    { background: rgba(0,113,227,0.08)   !important; }
+
+/* ── Expander ── */
+[data-testid="stExpander"] {
+    background: #FFFFFF;
+    border-radius: 14px !important;
+    border: 1px solid rgba(0,0,0,0.06) !important;
+}
+
+/* ── Divider ── */
+hr {
+    border: none !important;
+    border-top: 1px solid rgba(0,0,0,0.07) !important;
+    margin: 1.8rem 0 !important;
+}
+
+/* ── Caption ── */
+.stCaption, [data-testid="stCaptionContainer"] {
+    color: #6E6E73 !important; font-size: 0.82rem !important;
+}
+
+/* ── Spinner ── */
+.stSpinner > div { border-top-color: #0071E3 !important; }
+
+/* ── Number / text inputs ── */
+input[type="number"], input[type="text"] {
+    border-radius: 10px !important;
+    border: 1.5px solid #D2D2D7 !important;
+    background: #F5F5F7 !important;
+}
+input:focus {
+    border-color: #0071E3 !important;
+    box-shadow: 0 0 0 3px rgba(0,113,227,0.15) !important;
+}
+
+/* ── Progress bar ── */
+[data-testid="stProgressBar"] > div > div {
+    background: linear-gradient(90deg, #0071E3, #34AADC) !important;
+    border-radius: 980px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 
 # ─── helper functions ────────────────────────────────────────────────────────
 def _check_api_health() -> bool:
