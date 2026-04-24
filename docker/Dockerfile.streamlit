@@ -10,7 +10,7 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt \
         streamlit==1.56.0 \
-        plotly==6.1.2
+        plotly==5.24.1
 
 COPY app/      ./app/
 COPY src/      ./src/

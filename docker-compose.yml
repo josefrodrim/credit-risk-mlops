@@ -142,6 +142,7 @@ services:
     environment:
       API_URL: http://api:8000
       DATA_DIR: /app/data/processed
+      MLFLOW_TRACKING_URI: http://mlflow:5000
     ports:
       - "8501:8501"
     volumes:

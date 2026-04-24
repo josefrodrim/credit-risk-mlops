@@ -33,6 +33,7 @@ MONITOR_PATH = DATA_DIR / "monitor.parquet"
 TARGET     = "SeriousDlqin2yrs"
 PERIOD_COL = "periodo"
 AUC_GATE   = 0.87
+KS_GATE    = 0.30
 PSI_WARN   = 0.10
 PSI_ALERT  = 0.20
 
@@ -104,7 +105,8 @@ def _load_model() -> tuple:
         with open("params.yaml") as fh:
             cfg = yaml.safe_load(fh)
 
-        mlflow.set_tracking_uri(cfg["mlflow"]["tracking_uri"])
+        tracking_uri = os.getenv("MLFLOW_TRACKING_URI", cfg["mlflow"]["tracking_uri"])
+        mlflow.set_tracking_uri(tracking_uri)
         model_uri = f"models:/{cfg['mlflow']['model_name']}/Production"
         pipeline = mlflow.sklearn.load_model(model_uri)
         return pipeline, "MLflow Production"
@@ -142,26 +144,44 @@ def _psi(ref: pd.Series, prod: pd.Series, n_bins: int = 10) -> float:
 
 
 @st.cache_data(show_spinner=False)
-def _monthly_auc(_pipeline, cache_key: str) -> pd.DataFrame:
-    from sklearn.metrics import roc_auc_score
+def _monthly_metrics(_pipeline, cache_key: str) -> pd.DataFrame:
+    from sklearn.metrics import roc_auc_score, brier_score_loss
+    from scipy.stats import ks_2samp
 
     _, _, monitor = _load_data()
     rows = []
     for period, grp in monitor.groupby(PERIOD_COL):
         X = grp[FEATURE_COLS]
-        y = grp[TARGET]
-        if y.nunique() < 2:
+        y = grp[TARGET].values
+        if len(np.unique(y)) < 2:
             continue
         proba = _pipeline.predict_proba(X)[:, 1]
         auc   = roc_auc_score(y, proba)
+        gini  = 2 * auc - 1
+        brier = brier_score_loss(y, proba)
+        ks, _ = ks_2samp(proba[y == 1], proba[y == 0])
         rows.append({
             "periodo":      str(period),
             "auc":          auc,
-            "gini":         2 * auc - 1,
-            "pass":         auc >= AUC_GATE,
+            "gini":         gini,
+            "ks":           ks,
+            "brier":        brier,
+            "pass_auc":     auc >= AUC_GATE,
+            "pass_ks":      ks >= KS_GATE,
             "n":            len(grp),
             "default_rate": float(y.mean()),
         })
+    return pd.DataFrame(rows).sort_values("periodo")
+
+
+@st.cache_data(show_spinner=False)
+def _monthly_score_psi(_pipeline, cache_key: str) -> pd.DataFrame:
+    _, test, monitor = _load_data()
+    ref_scores = pd.Series(_pipeline.predict_proba(test[FEATURE_COLS])[:, 1])
+    rows = []
+    for period, grp in monitor.groupby(PERIOD_COL):
+        mon_scores = pd.Series(_pipeline.predict_proba(grp[FEATURE_COLS])[:, 1])
+        rows.append({"periodo": str(period), "score_psi": _psi(ref_scores, mon_scores)})
     return pd.DataFrame(rows).sort_values("periodo")
 
 
@@ -273,11 +293,23 @@ if page == "Single Application":
 # ─── page: batch scoring ──────────────────────────────────────────────────────
 elif page == "Batch Scoring":
     st.title("Batch Credit Scoring")
-    st.markdown(f"Upload a CSV with the required columns. Maximum **{BATCH_LIMIT} rows**.")
+    st.markdown(f"Upload a CSV or Parquet file with the required columns. Maximum **{BATCH_LIMIT} rows**.")
 
-    uploaded = st.file_uploader("Upload CSV", type=["csv"])
+    for key in ("batch_result_df", "batch_response", "batch_file_name"):
+        if key not in st.session_state:
+            st.session_state[key] = None
+
+    uploaded = st.file_uploader("Upload CSV or Parquet", type=["csv", "parquet"])
     if uploaded:
-        df = pd.read_csv(uploaded)
+        if uploaded.name != st.session_state.batch_file_name:
+            st.session_state.batch_result_df = None
+            st.session_state.batch_response  = None
+            st.session_state.batch_file_name = uploaded.name
+
+        if uploaded.name.endswith(".parquet"):
+            df = pd.read_parquet(uploaded)
+        else:
+            df = pd.read_csv(uploaded)
         st.write(f"Loaded {len(df)} rows × {len(df.columns)} columns")
         st.dataframe(df.head())
 
@@ -293,7 +325,9 @@ elif page == "Batch Scoring":
                 if not api_healthy:
                     st.error("API is not reachable.")
                 else:
-                    records = df[FEATURE_COLS].to_dict(orient="records")
+                    import json
+                    df_clean = df[FEATURE_COLS].replace([np.inf, -np.inf], np.nan)
+                    records = json.loads(df_clean.to_json(orient="records"))
                     with st.spinner(f"Scoring {len(records)} applications…"):
                         try:
                             response = _predict_batch(records)
@@ -306,20 +340,28 @@ elif page == "Batch Scoring":
                     result_df["default_probability"] = preds_df["default_probability"].values
                     result_df["prediction"]          = preds_df["prediction"].values
 
-                    st.success(f"Scored {response['count']} applications")
-                    c1, c2, c3 = st.columns(3)
-                    c1.metric("Total Applications", response["count"])
-                    c2.metric("High Risk (≥50%)", int((result_df["default_probability"] >= 0.5).sum()))
-                    c3.metric("Avg Default Prob", f"{result_df['default_probability'].mean():.1%}")
+                    st.session_state.batch_result_df = result_df
+                    st.session_state.batch_response  = response
 
-                    st.dataframe(
-                        result_df[["default_probability", "prediction"] + FEATURE_COLS[:5]].head(20)
-                    )
-                    csv = result_df.to_csv(index=False).encode("utf-8")
-                    st.download_button(
-                        "Download Results CSV", data=csv,
-                        file_name="credit_risk_scores.csv", mime="text/csv",
-                    )
+    # Render results outside the button block so they survive re-runs
+    if st.session_state.batch_result_df is not None:
+        result_df = st.session_state.batch_result_df
+        response  = st.session_state.batch_response
+
+        st.success(f"Scored {response['count']} applications")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Total Applications", response["count"])
+        c2.metric("High Risk (≥50%)", int((result_df["default_probability"] >= 0.5).sum()))
+        c3.metric("Avg Default Prob", f"{result_df['default_probability'].mean():.1%}")
+
+        st.dataframe(
+            result_df[["default_probability", "prediction"] + FEATURE_COLS[:5]].head(20)
+        )
+        csv = result_df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "Download Results CSV", data=csv,
+            file_name="credit_risk_scores.csv", mime="text/csv",
+        )
 
 
 # ─── page: monitoring dashboard ───────────────────────────────────────────────
@@ -358,58 +400,124 @@ elif page == "Monitoring Dashboard":
 
     st.markdown("---")
 
-    # ── Monthly AUC & Gini ──────────────────────────────────────────────────
-    st.subheader("Monthly AUC & Gini — Monitor Period 2026")
+    # ── Monthly metrics ─────────────────────────────────────────────────────
+    st.subheader("Monthly Performance Metrics — Monitor Period 2026")
 
-    with st.spinner("Computing monthly AUC…"):
-        monthly = _monthly_auc(pipeline, cache_key)
+    with st.spinner("Computing monthly metrics…"):
+        monthly     = _monthly_metrics(pipeline, cache_key)
+        monthly_psi = _monthly_score_psi(pipeline, cache_key)
 
     if monthly.empty:
-        st.info("No monthly AUC data available.")
+        st.info("No monthly data available.")
     else:
-        colors = ["green" if p else "red" for p in monthly["pass"]]
+        auc_colors = ["green" if p else "red" for p in monthly["pass_auc"]]
+        ks_colors  = ["green" if p else "red" for p in monthly["pass_ks"]]
+        gate_gini  = 2 * AUC_GATE - 1
 
-        left, right = st.columns(2)
-
-        with left:
+        # Row 1: AUC | Gini
+        col1, col2 = st.columns(2)
+        with col1:
             fig_auc = go.Figure(go.Bar(
                 x=monthly["periodo"], y=monthly["auc"],
-                marker_color=colors,
+                marker_color=auc_colors,
                 text=[f"{v:.4f}" for v in monthly["auc"]],
                 textposition="outside",
             ))
             fig_auc.add_hline(y=AUC_GATE, line_dash="dash", line_color="orange",
                                annotation_text=f"Gate {AUC_GATE}")
             fig_auc.update_layout(title="ROC-AUC per month",
-                                   yaxis_range=[0.80, 1.01], height=360,
+                                   yaxis_range=[0.80, 1.01], height=340,
                                    margin=dict(t=40, b=10))
             st.plotly_chart(fig_auc, use_container_width=True)
 
-        with right:
+        with col2:
             fig_gini = go.Figure(go.Bar(
                 x=monthly["periodo"], y=monthly["gini"],
-                marker_color=colors,
+                marker_color=auc_colors,
                 text=[f"{v:.4f}" for v in monthly["gini"]],
                 textposition="outside",
             ))
-            gate_gini = 2 * AUC_GATE - 1
             fig_gini.add_hline(y=gate_gini, line_dash="dash", line_color="orange",
                                 annotation_text=f"Gate {gate_gini:.2f}")
             fig_gini.update_layout(title="Gini = 2·AUC − 1",
-                                    yaxis_range=[0.60, 1.01], height=360,
+                                    yaxis_range=[0.60, 1.01], height=340,
                                     margin=dict(t=40, b=10))
             st.plotly_chart(fig_gini, use_container_width=True)
 
-        tbl = monthly[["periodo", "auc", "gini", "pass", "n", "default_rate"]].copy()
+        # Row 2: KS | Brier Score
+        col3, col4 = st.columns(2)
+        with col3:
+            fig_ks = go.Figure(go.Bar(
+                x=monthly["periodo"], y=monthly["ks"],
+                marker_color=ks_colors,
+                text=[f"{v:.4f}" for v in monthly["ks"]],
+                textposition="outside",
+            ))
+            fig_ks.add_hline(y=KS_GATE, line_dash="dash", line_color="orange",
+                              annotation_text=f"Gate {KS_GATE}")
+            fig_ks.update_layout(title="KS Statistic (max separation default vs non-default)",
+                                  yaxis_range=[0.0, 1.01], height=340,
+                                  margin=dict(t=40, b=10))
+            st.plotly_chart(fig_ks, use_container_width=True)
+
+        with col4:
+            fig_brier = go.Figure(go.Bar(
+                x=monthly["periodo"], y=monthly["brier"],
+                marker_color="steelblue",
+                text=[f"{v:.4f}" for v in monthly["brier"]],
+                textposition="outside",
+            ))
+            fig_brier.update_layout(
+                title="Brier Score (lower = better calibration)",
+                height=340, margin=dict(t=40, b=10),
+                yaxis_title="Brier Score",
+            )
+            st.plotly_chart(fig_brier, use_container_width=True)
+
+        # Row 3: Score PSI per month
+        if not monthly_psi.empty:
+            psi_mon_colors = [
+                "crimson" if v > PSI_ALERT else "darkorange" if v > PSI_WARN else "steelblue"
+                for v in monthly_psi["score_psi"]
+            ]
+            fig_spsi = go.Figure(go.Bar(
+                x=monthly_psi["periodo"], y=monthly_psi["score_psi"],
+                marker_color=psi_mon_colors,
+                text=[f"{v:.4f}" for v in monthly_psi["score_psi"]],
+                textposition="outside",
+            ))
+            fig_spsi.add_hline(y=PSI_WARN,  line_dash="dot", line_color="darkorange",
+                                annotation_text="0.10 warn")
+            fig_spsi.add_hline(y=PSI_ALERT, line_dash="dot", line_color="crimson",
+                                annotation_text="0.20 alert")
+            fig_spsi.update_layout(
+                title="Score PSI per month (vs Test 2024–2025 reference)",
+                height=300, margin=dict(t=40, b=10),
+                yaxis_title="PSI",
+            )
+            st.plotly_chart(fig_spsi, use_container_width=True)
+
+        # Summary table
+        tbl = monthly[["periodo", "auc", "gini", "ks", "brier",
+                        "pass_auc", "pass_ks", "n", "default_rate"]].copy()
+        if not monthly_psi.empty:
+            tbl = tbl.merge(monthly_psi, on="periodo", how="left")
         tbl["auc"]          = tbl["auc"].round(4)
         tbl["gini"]         = tbl["gini"].round(4)
+        tbl["ks"]           = tbl["ks"].round(4)
+        tbl["brier"]        = tbl["brier"].round(4)
         tbl["default_rate"] = tbl["default_rate"].map("{:.2%}".format)
-        tbl["pass"]         = tbl["pass"].map({True: "✅ PASS", False: "❌ FAIL"})
-        st.dataframe(
-            tbl.rename(columns={"periodo": "Period", "auc": "AUC", "gini": "Gini",
-                                  "pass": "Gate", "n": "Rows", "default_rate": "Default Rate"}),
-            use_container_width=True, hide_index=True,
-        )
+        tbl["pass_auc"]     = tbl["pass_auc"].map({True: "✅", False: "❌"})
+        tbl["pass_ks"]      = tbl["pass_ks"].map({True: "✅", False: "❌"})
+        rename = {
+            "periodo": "Period", "auc": "AUC", "gini": "Gini",
+            "ks": "KS", "brier": "Brier", "pass_auc": "AUC Gate",
+            "pass_ks": "KS Gate", "n": "Rows", "default_rate": "Default Rate",
+        }
+        if "score_psi" in tbl.columns:
+            tbl["score_psi"] = tbl["score_psi"].round(4)
+            rename["score_psi"] = "Score PSI"
+        st.dataframe(tbl.rename(columns=rename), use_container_width=True, hide_index=True)
 
     st.markdown("---")
 

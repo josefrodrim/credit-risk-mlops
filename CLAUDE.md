@@ -26,7 +26,7 @@ credit-risk-mlops/
 │   ├── evaluate.py                   # AUC gate, saves metrics to metrics/
 │   └── predict.py                    # batch prediction helper
 ├── api/main.py                       # FastAPI: /predict, /health, /predict/batch, /metrics
-├── app/streamlit_app.py              # Streamlit UI (← PENDING: Gini/monitoring dashboard)
+├── app/streamlit_app.py              # Streamlit UI: scoring form, batch (CSV/Parquet), monitoring dashboard
 ├── scripts/
 │   ├── generate_dataset.py           # synthetic 1M-row dataset
 │   └── featurize.py                  # three-way temporal split → parquets
@@ -167,19 +167,17 @@ except Exception:
   Reads parquets directly, MLflow fallback pattern.
 
 `docker/Dockerfile.streamlit` updated: added `libgomp1`, `streamlit==1.56.0`, `plotly==6.1.2`.
-`docker-compose.yml` streamlit service: added `./data:/app/data` volume + `DATA_DIR` env var.
+`docker-compose.yml` streamlit service: added `DATA_DIR` env var. Volume later changed to named volume in Task 11.
 
 ### 2. README.md ✅
 
 Created at repo root: overview, architecture ASCII diagram, dataset table, quickstart (3 steps),
 training instructions, API endpoints + curl example, monitoring section, CI/CD table, key results.
 
-### 3. Rebuild Streamlit Docker image ⚠️ (still needed)
+### 3. Rebuild Streamlit Docker image ✅
 
-Run before using Streamlit in Docker:
 ```bash
 docker compose build streamlit
-# then start:
 docker compose --profile demo up -d streamlit
 ```
 
@@ -228,6 +226,56 @@ docker compose --profile demo up -d streamlit
 - Clone URL: placeholder → `https://github.com/josefrodrin/credit-risk-mlops.git`
 - Services table: removed `admin/admin` from Grafana row
 - Monitoring section heading: removed `admin/admin` from `### Grafana (http://localhost:3000, admin/admin)`
+
+## Completed tasks (2026-04-20, session 3)
+
+### 11. Streamlit named volume fix ✅
+
+`docker-compose.yml` streamlit service: `./data:/app/data` bind mount → `streamlit-data` named volume.
+Same fix pattern as Prometheus/Nginx/Grafana (colon in repo path breaks Docker bind mount parsing).
+
+Added `streamlit-data:` to top-level `volumes:` section.
+
+After first start, populate the volume once with:
+```bash
+docker exec credit-risk-streamlit mkdir -p /app/data/processed
+docker cp "/Users/josefrodriguez/repos_publicar/credit-risk-mlops:/data/processed/train.parquet"   credit-risk-streamlit:/app/data/processed/
+docker cp "/Users/josefrodriguez/repos_publicar/credit-risk-mlops:/data/processed/test.parquet"    credit-risk-streamlit:/app/data/processed/
+docker cp "/Users/josefrodriguez/repos_publicar/credit-risk-mlops:/data/processed/monitor.parquet" credit-risk-streamlit:/app/data/processed/
+```
+The named volume persists across container restarts — copy only needed once.
+
+### 12. GitHub repo metadata ✅
+
+- **Description**: End-to-end MLOps platform for credit default prediction — XGBoost/LightGBM with Optuna HPO, MLflow Model Registry, FastAPI inference API, DVC data pipeline, Prometheus/Grafana monitoring, and Jenkins CI/CD. Deployed via Docker Compose.
+- **Topics**: `mlops machine-learning xgboost lightgbm mlflow fastapi docker jenkins python credit-risk`
+
+## Completed tasks (2026-04-23)
+
+### 13. Batch Scoring — soporte Parquet ✅
+
+`app/streamlit_app.py` Batch Scoring page:
+
+- `st.file_uploader` acepta ahora `["csv", "parquet"]`
+- Detecta la extensión del archivo y usa `pd.read_parquet` o `pd.read_csv` según corresponda
+- Texto descriptivo actualizado: "Upload a CSV or Parquet file"
+
+### 14. Batch Scoring — NaN/Inf no serializable a JSON ✅
+
+`app/streamlit_app.py`: el parquet de test contenía `NaN` e `Inf` que rompían la serialización JSON de `requests`.
+
+Fix: `json.loads(df_clean.to_json(orient="records"))` — pandas convierte NaN/Inf a null de forma garantizada antes de enviarlo al API.
+
+### 15. MLflow no alcanzable desde contenedor Streamlit ✅
+
+Causa: `params.yaml` tiene `tracking_uri: http://localhost:5001` pero dentro del contenedor `localhost` es el propio contenedor, no el host. El modelo nunca cargaba desde MLflow y caía al fallback (re-entrenaba 50k filas en cada arranque).
+
+- `app/streamlit_app.py` `_load_model()`: usa `os.getenv("MLFLOW_TRACKING_URI", cfg[...])` 
+- `docker-compose.yml` streamlit service: agregado `MLFLOW_TRACKING_URI: http://mlflow:5000`
+
+### 16. plotly==6.1.2 → 5.24.1 ✅
+
+`docker/Dockerfile.streamlit`: conflicto entre `plotly==6.1.2` y `evidently==0.7.21`. Corregido a `5.24.1` (versión del venv local compatible con evidently).
 
 ## Reglas de git para este proyecto
 
